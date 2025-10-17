@@ -1,136 +1,101 @@
-with tab3:
-    st.header("📝 Text Analysis & Visualization")
+import streamlit as st
+from gtts import gTTS
+import os
+import speech_recognition as sr
+from pydub import AudioSegment
+import io
+import numpy as np
+from PIL import Image
 
-    # Hardcoded sample stories
-    stories = [
-        # --- Your existing story list ---
-        """In a remote kingdom nestled between jagged mountains...""",
-        """During the bustling era of the 1920s, in a city that never slept...""",
-        """On a distant exoplanet, where the sky shimmered...""",
-        """In the neon-lit heart of Tokyo, young coder Akira...""",
-        """Deep in the Amazon rainforest, a team of scientists..."""
-    ]
+# Optional heavy libs (use try/except for Streamlit Cloud safety)
+try:
+    from rembg import remove
+except ImportError:
+    remove = None
 
-    # Initialize text area session state
-    if "text_area" not in st.session_state:
-        st.session_state.text_area = ""
+try:
+    from deepface import DeepFace
+except ImportError:
+    DeepFace = None
 
-    # Random story button
-    if st.button("🎲 Random Story"):
-        st.session_state.text_area = random.choice(stories)
+st.set_page_config(page_title="Unstructured Data Analysis", layout="wide")
+st.title("🧠 Unstructured Data Analysis")
 
-    # Text input area
-    st.session_state.text_area = st.text_area(
-        "📜 Paste or modify your text here:",
-        value=st.session_state.text_area,
-        height=250
-    )
+tab1, tab2, tab3 = st.tabs(["🖼️ Image Analysis", "🎧 Audio Analysis", "📝 Text Analysis"])
 
-    # Analyze button
-    if st.button("Analyze Text 🚀"):
-        text = st.session_state.text_area.strip()
+# ========== IMAGE ANALYSIS TAB ==========
+with tab1:
+    st.header("Image Analysis")
 
-        if text:
-            blob = TextBlob(text)
+    uploaded_img = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+    if uploaded_img:
+        image = Image.open(uploaded_img)
+        st.image(image, caption="Original Image", use_container_width=True)
 
-            # -----------------------------
-            # 1️⃣ Language Detection
-            # -----------------------------
-            lang = blob.detect_language()
-            if lang != 'en':
-                st.info(f"🌐 Detected language: {lang}. Translating to English...")
-                blob = blob.translate(to='en')
-
-            # -----------------------------
-            # 2️⃣ Sentiment Analysis
-            # -----------------------------
-            polarity = round(blob.sentiment.polarity, 3)
-            subjectivity = round(blob.sentiment.subjectivity, 3)
-
-            st.subheader("💬 Sentiment Analysis")
-            sentiment = (
-                "😊 Positive" if polarity > 0.1 else
-                "😐 Neutral" if -0.1 <= polarity <= 0.1 else
-                "😠 Negative"
-            )
-            st.write(f"**Sentiment:** {sentiment}")
-            st.write(f"**Polarity:** {polarity}")
-            st.write(f"**Subjectivity:** {subjectivity}")
-
-            # Polarity bar
-            st.progress((polarity + 1) / 2)
-
-            # -----------------------------
-            # 3️⃣ POS Tagging
-            # -----------------------------
-            words_and_tags = blob.tags
-            nouns = [w for w, t in words_and_tags if t.startswith('NN')]
-            verbs = [w for w, t in words_and_tags if t.startswith('VB')]
-            adjectives = [w for w, t in words_and_tags if t.startswith('JJ')]
-            adverbs = [w for w, t in words_and_tags if t.startswith('RB')]
-
-            # -----------------------------
-            # 4️⃣ WordCloud Function
-            # -----------------------------
-            def make_wordcloud(words, color):
-                if not words:
-                    return None
-                wc = WordCloud(width=500, height=400, background_color='black', colormap=color).generate(" ".join(words))
-                fig, ax = plt.subplots()
-                ax.imshow(wc, interpolation='bilinear')
-                ax.axis("off")
-                return fig
-
-            # -----------------------------
-            # 5️⃣ Display WordClouds
-            # -----------------------------
-            col1, col2 = st.columns(2)
-            col3, col4 = st.columns(2)
-
-            with col1:
-                st.markdown("### 🧠 Nouns")
-                fig = make_wordcloud(nouns, "plasma")
-                if fig: st.pyplot(fig)
-            with col2:
-                st.markdown("### ⚡ Verbs")
-                fig = make_wordcloud(verbs, "inferno")
-                if fig: st.pyplot(fig)
-            with col3:
-                st.markdown("### 🎨 Adjectives")
-                fig = make_wordcloud(adjectives, "cool")
-                if fig: st.pyplot(fig)
-            with col4:
-                st.markdown("### 💨 Adverbs")
-                fig = make_wordcloud(adverbs, "magma")
-                if fig: st.pyplot(fig)
-
-            # -----------------------------
-            # 6️⃣ POS Counts
-            # -----------------------------
-            st.markdown("### 📊 POS Counts")
-            st.write({
-                "Nouns": len(nouns),
-                "Verbs": len(verbs),
-                "Adjectives": len(adjectives),
-                "Adverbs": len(adverbs)
-            })
-
-            # -----------------------------
-            # 7️⃣ Download Analysis
-            # -----------------------------
-            report = f"""
-            TEXT ANALYSIS REPORT
-            -------------------------
-            Sentiment: {sentiment}
-            Polarity: {polarity}
-            Subjectivity: {subjectivity}
-
-            Nouns: {len(nouns)} | Verbs: {len(verbs)} | Adjectives: {len(adjectives)} | Adverbs: {len(adverbs)}
-            -------------------------
-            Most frequent Nouns: {', '.join(nouns[:10])}
-            Most frequent Verbs: {', '.join(verbs[:10])}
-            """
-            st.download_button("⬇️ Download Analysis Report", report, file_name="text_analysis.txt")
-
+        # Background removal
+        if remove:
+            if st.button("🪄 Remove Background"):
+                with st.spinner("Removing background..."):
+                    img_bytes = io.BytesIO()
+                    image.save(img_bytes, format="PNG")
+                    output = remove(img_bytes.getvalue())
+                    result_img = Image.open(io.BytesIO(output))
+                    st.image(result_img, caption="Background Removed", use_container_width=True)
         else:
-            st.warning("Please paste or select some text first.")
+            st.warning("⚠️ rembg not available. Skipping background removal.")
+
+        # Face analysis
+        if DeepFace:
+            if st.button("🔍 Analyze Faces"):
+                with st.spinner("Analyzing faces..."):
+                    try:
+                        analysis = DeepFace.analyze(np.array(image), actions=["emotion", "age", "gender"], enforce_detection=False)
+                        st.subheader("🧩 Face Analysis Results")
+                        st.json(analysis[0] if isinstance(analysis, list) else analysis)
+                    except Exception as e:
+                        st.error(f"Error during face analysis: {e}")
+        else:
+            st.warning("⚠️ DeepFace not available. Skipping face analysis.")
+
+# ========== AUDIO ANALYSIS TAB ==========
+with tab2:
+    st.header("Audio Analysis")
+
+    uploaded_audio = st.file_uploader("Upload audio file", type=["mp3", "wav", "m4a"])
+    if uploaded_audio:
+        st.audio(uploaded_audio, format="audio/wav")
+        recognizer = sr.Recognizer()
+
+        # Convert to wav if needed
+        if uploaded_audio.type != "audio/wav":
+            sound = AudioSegment.from_file(uploaded_audio)
+            wav_buffer = io.BytesIO()
+            sound.export(wav_buffer, format="wav")
+            wav_buffer.seek(0)
+        else:
+            wav_buffer = uploaded_audio
+
+        # Transcribe audio
+        if st.button("🗣️ Convert Speech to Text"):
+            with sr.AudioFile(wav_buffer) as source:
+                audio_data = recognizer.record(source)
+                try:
+                    text = recognizer.recognize_google(audio_data)
+                    st.success("✅ Transcription Complete")
+                    st.write(text)
+                except Exception as e:
+                    st.error(f"Speech recognition failed: {e}")
+
+# ========== TEXT ANALYSIS TAB ==========
+with tab3:
+    st.header("Text-to-Speech Converter")
+
+    input_text = st.text_area("Enter text to convert to speech", height=150)
+    if st.button("🔊 Convert to Speech"):
+        if input_text.strip():
+            tts = gTTS(text=input_text, lang='en')
+            tts.save("speech.mp3")
+            st.audio("speech.mp3")
+            st.success("✅ Audio Generated Successfully")
+        else:
+            st.warning("Please enter text to convert.")
