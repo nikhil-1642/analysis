@@ -6,3 +6,4 @@ rembg
 deepface
 numpy
 Pillow
+onnxruntime-gpu
